@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "pygameboycolor"
+version = "0.1.0"
+description = ""
+authors = ["Cory Monroe <cory.s.monroe@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+numpy = "^1.15"
+PyOpenGL = "^3.1"
+glfw = "^1.7"
+pygameboycore = "^0.0.3"
+
+[tool.poetry.dev-dependencies]
+pytest = "^3.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"

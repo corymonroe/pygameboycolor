@@ -6,20 +6,21 @@ import pygameboycore
 import sys
 import time
 
-GB_SIZE = (160, 144)
-WINDOW_SIZE = (640, 480)
+GB_WIDTH = 160
+GB_HEIGHT = 144
+WINDOW_WIDTH = 640
+WINDOW_HEIGHT = 480
 
 class PyGameboyColor(object):
-    def __init__(self, dim):
-        self.vblank = False
-
+    def __init__(self, width, height):
         if not glfw.init():
-            return
-        window = glfw.create_window(dim[0], dim[1], "PyGameboy Color", None, None)
+            raise Exception('cannot initialize glfw')
+
+        window = glfw.create_window(width, height, "PyGameboy Color", None, None)
 
         if not window:
             glfw.terminate()
-            return
+            raise Exception('cannot create glfw window')
 
         # Make the window's context current
         glfw.make_context_current(window)
@@ -27,8 +28,8 @@ class PyGameboyColor(object):
         self.window = window
 
         # 160x144 is the Gameboy window size
-        self.color_frame_buffer = numpy.zeros(
-            GB_SIZE[0] * GB_SIZE[1] * 4,
+        self.color_frame_buffer = numpy.empty(
+            GB_WIDTH * GB_HEIGHT * 3,
             numpy.uint8
         )
 
@@ -38,11 +39,11 @@ class PyGameboyColor(object):
         glTexImage2D(
             GL_TEXTURE_2D,
             0,
-            GL_RGBA,
-            GB_SIZE[0],
-            GB_SIZE[1],
+            GL_RGB,
+            GB_WIDTH,
+            GB_HEIGHT,
             0,
-            GL_RGBA,
+            GL_RGB,
             GL_UNSIGNED_BYTE,
             self.color_frame_buffer,
         )
@@ -69,7 +70,6 @@ class PyGameboyColor(object):
 
     def run(self, filename):
         self.core.open(filename)
-        self.core.register_scanline_callback(self.scanline_callback)
         self.core.register_vblank_callback(self.vblank_callback)
 
         # Loop until the user closes the window
@@ -78,9 +78,7 @@ class PyGameboyColor(object):
         while not glfw.window_should_close(self.window):
             glfw.poll_events()
 
-            self.vblank = False
-            while not self.vblank:
-                self.core.update(512)
+            self.core.update()
 
             self.render()
 
@@ -106,17 +104,8 @@ class PyGameboyColor(object):
 
         self.core.input(gbkey, gbaction)
 
-    def scanline_callback(self, scanline, line):
-        w = GB_SIZE[0]
-        for i in range(len(scanline)):
-            pixel = scanline[i]
-            index = (i + (w * line)) * 4
-            self.color_frame_buffer[index] = pixel.r
-            self.color_frame_buffer[index+1] = pixel.g
-            self.color_frame_buffer[index+2] = pixel.b
-
-    def vblank_callback(self):
-        self.vblank = True
+    def vblank_callback(self, framebuffer):
+        self.color_frame_buffer[:] = framebuffer
 
     def render(self):
         glBindTexture(GL_TEXTURE_2D, self.texture)
@@ -125,9 +114,9 @@ class PyGameboyColor(object):
             0, 
             0,
             0,
-            GB_SIZE[0],
-            GB_SIZE[1],
-            GL_RGBA,
+            GB_WIDTH,
+            GB_HEIGHT,
+            GL_RGB,
             GL_UNSIGNED_BYTE,
             self.color_frame_buffer,
         )
@@ -137,24 +126,24 @@ class PyGameboyColor(object):
 
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        glOrtho(0.0, GB_SIZE[0], 0.0, GB_SIZE[1], -1.0, 1.0)
+        glOrtho(0.0, GB_WIDTH, 0.0, GB_HEIGHT, -1.0, 1.0)
         glMatrixMode(GL_MODELVIEW)
 
         glBegin(GL_QUADS)
         glTexCoord2d(0.0, 1.0)
         glVertex2d(0.0, 0.0)
         glTexCoord2d(1.0, 1.0)
-        glVertex2d(GB_SIZE[0], 0.0)
+        glVertex2d(GB_WIDTH, 0.0)
         glTexCoord2d(1.0, 0.0)
-        glVertex2d(GB_SIZE[0], GB_SIZE[1])
+        glVertex2d(GB_WIDTH, GB_HEIGHT)
         glTexCoord2d(0.0, 0.0)
-        glVertex2d(0.0, GB_SIZE[1])
+        glVertex2d(0.0, GB_HEIGHT)
         glEnd()
 
         glfw.swap_buffers(self.window)
 
 def main():
-    gb = PyGameboyColor(WINDOW_SIZE)
+    gb = PyGameboyColor(WINDOW_WIDTH, WINDOW_HEIGHT)
     gb.run(sys.argv[1])
 
 if __name__ == '__main__':
