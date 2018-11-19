@@ -1,4 +1,5 @@
 from OpenGL.GL import *
+from pathlib import Path
 
 import glfw
 import numpy
@@ -16,18 +17,16 @@ class PyGameboyColor(object):
         if not glfw.init():
             raise Exception('cannot initialize glfw')
 
-        window = glfw.create_window(width, height, "PyGameboy Color", None, None)
+        window = glfw.create_window(width, height, "PyGameboyColor", None, None)
 
         if not window:
             glfw.terminate()
             raise Exception('cannot create glfw window')
 
-        # Make the window's context current
         glfw.make_context_current(window)
 
         self.window = window
 
-        # 160x144 is the Gameboy window size
         self.color_frame_buffer = numpy.empty(
             GB_WIDTH * GB_HEIGHT * 3,
             numpy.uint8
@@ -53,44 +52,35 @@ class PyGameboyColor(object):
         glfw.set_key_callback(self.window, self.process_input)
 
         self.action_map = {
-            glfw.PRESS:pygameboycore.KeyAction.ACTION_PRESS,
-            glfw.RELEASE:pygameboycore.KeyAction.ACTION_RELEASE,
+            glfw.PRESS: pygameboycore.KeyAction.ACTION_PRESS,
+            glfw.RELEASE: pygameboycore.KeyAction.ACTION_RELEASE,
         }
 
         self.key_map = {
-            glfw.KEY_W:pygameboycore.JoypadKey.KEY_UP,
-            glfw.KEY_A:pygameboycore.JoypadKey.KEY_LEFT,
-            glfw.KEY_D:pygameboycore.JoypadKey.KEY_RIGHT,
-            glfw.KEY_S:pygameboycore.JoypadKey.KEY_DOWN,
-            glfw.KEY_J:pygameboycore.JoypadKey.KEY_A,
-            glfw.KEY_K:pygameboycore.JoypadKey.KEY_B,
-            glfw.KEY_ENTER:pygameboycore.JoypadKey.KEY_START,
-            glfw.KEY_LEFT_SHIFT:pygameboycore.JoypadKey.KEY_SELECT,
+            glfw.KEY_W: pygameboycore.JoypadKey.KEY_UP,
+            glfw.KEY_A: pygameboycore.JoypadKey.KEY_LEFT,
+            glfw.KEY_D: pygameboycore.JoypadKey.KEY_RIGHT,
+            glfw.KEY_S: pygameboycore.JoypadKey.KEY_DOWN,
+            glfw.KEY_J: pygameboycore.JoypadKey.KEY_A,
+            glfw.KEY_K: pygameboycore.JoypadKey.KEY_B,
+            glfw.KEY_ENTER: pygameboycore.JoypadKey.KEY_START,
+            glfw.KEY_LEFT_SHIFT: pygameboycore.JoypadKey.KEY_SELECT,
         }
 
-    def run(self, filename):
-        self.core.open(filename)
-        self.core.register_vblank_callback(self.vblank_callback)
+    def load_state(self, filename):
+        save_filename = f'{filename}.sav'
+        if Path(save_filename).is_file():
+            with open(save_filename, 'r') as save_file:
+                save_state = list(map(int, save_file.read().split('\n')))
+                self.core.set_save_data(save_state)
 
-        # Loop until the user closes the window
-        fps = 0
-        global_start = time.time()
-        while not glfw.window_should_close(self.window):
-            glfw.poll_events()
+    def save_state(self, filename):
+        save_filename = f'{filename}.sav'
+        with open(save_filename, 'w') as save_file:
+            save_file.write('\n'.join(map(str, self.core.get_save_data())))
 
-            self.core.update()
-
-            self.render()
-
-            fps += 1
-            global_curr = time.time()
-
-            if global_curr - global_start > 1.0:
-                print(f'FPS: {fps}')
-                fps = 0
-                global_start = global_curr
-
-        glfw.terminate()
+    def vblank_callback(self, framebuffer):
+        self.color_frame_buffer[:] = framebuffer
 
     def process_input(self, window, key, scancode, action, mods):
         if key not in self.key_map:
@@ -104,8 +94,26 @@ class PyGameboyColor(object):
 
         self.core.input(gbkey, gbaction)
 
-    def vblank_callback(self, framebuffer):
-        self.color_frame_buffer[:] = framebuffer
+    def run(self, filename):
+        self.core.open(filename)
+
+        self.load_state(filename)
+
+        self.core.register_vblank_callback(self.vblank_callback)
+
+        try:
+            while not glfw.window_should_close(self.window):
+                glfw.poll_events()
+
+                self.core.update()
+
+                self.render()
+        except KeyboardInterrupt:
+            pass
+
+        self.save_state(filename)
+
+        glfw.terminate()
 
     def render(self):
         glBindTexture(GL_TEXTURE_2D, self.texture)

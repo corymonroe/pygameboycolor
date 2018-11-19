@@ -9,7 +9,7 @@ python = "^3.7"
 numpy = "^1.15"
 PyOpenGL = "^3.1"
 glfw = "^1.7"
-pygameboycore = "^0.0.3"
+pygameboycore = "^0.0.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^3.0"
